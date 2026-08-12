@@ -298,7 +298,9 @@ export const HAND_WRITTEN_RECORDS: OutreachRecord[] = [
         }),
       },
     },
-    attempt: { state: "PENDING_APPROVAL" },
+    // G09 blocks: a draft written for the wrong market never reaches a
+    // reviewer's queue.
+    attempt: { state: "BLOCKED" },
   }),
 
   // ── 5. Clean, seasonal angle ───────────────────────────────────
@@ -708,11 +710,11 @@ export const HAND_WRITTEN_RECORDS: OutreachRecord[] = [
       durationMs: 46,
       failures: {
         G02_length: (body) => ({
-          detail: `Body is ${body.length} characters; the limit for en-IE is 900. Warning only — an over-long draft is a quality problem, not a compliance one.`,
+          detail: `Body is ${body.length} characters; the limit for en-IE is 900.`,
         }),
       },
     },
-    attempt: { state: "PENDING_APPROVAL" },
+    attempt: { state: "BLOCKED" },
   }),
 
   // ── 11. Escalated all the way to Opus ──────────────────────────

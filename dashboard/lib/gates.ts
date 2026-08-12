@@ -57,23 +57,32 @@ export const GATE_LABELS: Record<GateId, string> = {
 /**
  * Whether a gate blocks the send or only warns.
  *
- * Severity belongs to the gate, not to the occurrence: an over-length draft is
- * a quality problem every time it happens, and an ungrounded claim stops the
- * send every time it happens. The contract carries `severity` on each outcome
- * so the backend can state it per result; this map is what the dashboard's
- * fixtures state it from.
+ * Severity belongs to the gate, not to the occurrence: an ungrounded claim
+ * stops the send every time it happens, and a second call to action is a
+ * quality problem every time it happens. The contract carries `severity` on
+ * each outcome so the backend can state it per result; this map is what the
+ * dashboard's fixtures state it from.
+ *
+ * These follow the gate table in EVALS.md, which is the specification and the
+ * same source the `gates` service implements from. They were wrong here until
+ * the gates were built: written against mocks before there was an
+ * implementation to check them against, this map had G02 and G09 warning and
+ * G10 blocking — the exact reverse of the spec on all three. A draft running
+ * long was shown as survivable and a second call to action as fatal, which is
+ * backwards in the direction that matters: length is cosmetic, and a draft in
+ * the wrong language is not.
  */
 export const GATE_SEVERITY: Record<GateId, GateSeverity> = {
   G01_schema: "blocking",
-  G02_length: "warning",
+  G02_length: "blocking",
   G03_placeholders: "blocking",
   G04_merchant_name: "blocking",
   G05_evidence_grounding: "blocking",
   G06_no_invented_numbers: "blocking",
   G07_banned_claims: "blocking",
   G08_pii: "blocking",
-  G09_locale: "warning",
-  G10_single_cta: "blocking",
+  G09_locale: "blocking",
+  G10_single_cta: "warning",
   G11_frequency_cap: "blocking",
   G12_compliance: "blocking",
 };
