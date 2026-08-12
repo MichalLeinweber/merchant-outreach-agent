@@ -240,20 +240,32 @@ These are decisions, not omissions:
 ## Development
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm run lint        # eslint
-npm run test        # vitest
-npm run build       # typecheck + Encore container build
-npm run verify      # all four, in order
-encore run          # start the app locally
+npm run typecheck    # tsc --noEmit
+npm run lint         # eslint
+npm run test         # vitest
+npm run build        # tsc --noEmit
+npm run verify       # all four, in order — no Docker needed, runs in seconds
+npm run build:docker # typecheck + Encore container build (needs Docker + the Encore CLI)
+encore run           # start the app locally
 
 npm run generate:merchants   # regenerate the synthetic seed file
 npm run seed                 # load it into a running app via the ingest API
 ```
 
-`npm run verify` is the one that matters. Three of the four steps passing is
-not a green build — the build step needs Docker running, and it is the step
-most likely to be skipped and most likely to be broken.
+`npm run verify` is the one that matters locally, and it is deliberately
+**typecheck, lint and unit tests only**. The Encore container build is a
+separate script, `npm run build:docker`, and CI runs it as its own job on every
+pull request.
+
+That split is a decision about where a gate belongs. A commit gate that needs
+Docker, takes minutes and can hang on a misbehaving CLI is a gate people learn
+to bypass, and a bypassed gate protects nothing. So the fast checks run on
+every commit, and the slow one runs where it cannot be skipped from a
+developer's machine.
+
+The consequence is that a green `verify` does not prove the application builds
+as a container — read it as "compiles, lints, unit tests pass" and nothing
+more.
 
 ### Pre-commit hook
 

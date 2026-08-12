@@ -1,10 +1,17 @@
 #!/bin/sh
 #
-# Runs the full verification suite before allowing a commit.
+# Runs the verification suite before allowing a commit.
 #
 # This exists because a commit once went out with a broken build after
 # typecheck, lint and tests had passed and been reported as "validation
 # passed". The build was never run. CI caught it; this catches it earlier.
+#
+# What it does NOT cover: the Encore container build (`npm run build:docker`)
+# and the dashboard. `npm run build` is a typecheck, so this hook needs no
+# Docker and finishes in seconds. The container build is a CI job — see
+# .github/workflows/ci.yml. Keeping it out of the hook is a deliberate
+# trade: a commit gate that takes minutes, or hangs on a machine where the
+# Encore CLI misbehaves, is a gate people start bypassing.
 #
 # To skip it — see the note at the bottom of this file before you do:
 #
@@ -15,17 +22,6 @@ set -e
 echo "pre-commit: running npm run verify"
 echo
 
-# `npm run build` shells out to Encore, which builds a container image. Without
-# Docker the step fails with an error about the daemon, which reads like a
-# problem with the commit rather than with the machine. Say what is actually
-# wrong instead.
-if ! docker info >/dev/null 2>&1; then
-	echo "pre-commit: the Docker daemon is not running." >&2
-	echo "            'npm run build' needs it, because Encore builds a container image." >&2
-	echo "            Start Docker, or commit with --no-verify and run 'npm run verify' before you push." >&2
-	exit 1
-fi
-
 if ! npm run verify; then
 	echo >&2
 	echo "pre-commit: verify failed — commit blocked." >&2
@@ -35,7 +31,8 @@ if ! npm run verify; then
 fi
 
 echo
-echo "pre-commit: verify passed"
+echo "pre-commit: verify passed (typecheck, lint, tests)"
+echo "pre-commit: the Encore container build is not part of this — CI runs it."
 
 # On --no-verify: a blocked commit in the middle of unfinished work is worse
 # than a broken commit on a branch. Saving work in progress has to stay

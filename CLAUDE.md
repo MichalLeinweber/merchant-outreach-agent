@@ -8,8 +8,21 @@ they conflict.
 **Never report a task as done without running `npm run verify` first.**
 
 ```bash
-npm run verify   # typecheck && lint && test && build
+npm run verify   # typecheck && lint && test && build (build == tsc --noEmit)
 ```
+
+### What `verify` covers, and what it does not
+
+| Covered | Not covered |
+|---|---|
+| `tsc --noEmit` (twice: as `typecheck` and as `build`) | **The Encore container build** — `npm run build:docker`, which needs Docker and the Encore CLI. CI runs it as its own job. |
+| `eslint .` | **The dashboard** — `dashboard/` is a separate Next.js application with its own build, outside this workspace. |
+| `vitest run` — unit tests, no database | **Anything needing Postgres.** The unit suite never touches the database, so SQL in the service layer is typechecked but not executed. |
+
+A green `verify` therefore means "this compiles, lints and its unit tests
+pass". It does not mean the application builds as a container, and it does not
+mean an endpoint that talks to Postgres works. Say which of the two you have
+evidence for; do not let one stand in for the other.
 
 Rules that follow from that:
 
@@ -23,15 +36,21 @@ Rules that follow from that:
   that happened to pass and leave the failure out.
 
 This rule exists because it was broken once. `typecheck`, `lint` and `test`
-were run and reported as "validation passed"; `build` was not run, and it was
+were run and reported as "validation passed"; the build was not run, and it was
 the one that was broken. CI caught it, which is the point of CI — but the
 report that preceded it was wrong.
 
-### When `verify` cannot run
+### When a step cannot run
 
-`npm run build` needs Docker running, because Encore builds a container image.
-If Docker is unavailable, say so explicitly and name what is therefore
-unverified. Do not silently drop the step and report the rest as a pass.
+`npm run build:docker` needs Docker and the Encore CLI, and it is slow. It is
+deliberately outside `verify` and outside the pre-commit hook, so neither
+depends on Docker being up. That is also why nothing may claim the container
+build passed on the strength of `verify`: name it as unverified, and let CI be
+the thing that proves it.
+
+The same applies to any step you skipped for any reason. Say which one, and say
+what is therefore unverified. Do not silently drop it and report the rest as a
+pass.
 
 ## Contracts are frozen
 
