@@ -88,8 +88,12 @@ jobs:
           curl -fsSL https://encore.dev/install.sh | bash
           echo "$HOME/.encore/bin" >> "$GITHUB_PATH"
 
+      # --skip-config: the point here is that the application compiles and its
+      # service topology resolves, not that it is ready to self-host. Without
+      # the flag the build demands an infra configuration file naming a
+      # database host, which CI has no reason to provide.
       - name: Build
-        run: encore build docker merchant-outreach-agent:ci --local
+        run: encore build docker merchant-outreach-agent:ci --skip-config
 
   secrets:
     name: Secret scan

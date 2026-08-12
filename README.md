@@ -191,10 +191,47 @@ These are decisions, not omissions:
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm run test        # vitest
+npm run build       # typecheck + Encore container build
+npm run verify      # all four, in order
 encore run          # start the app locally
 ```
 
-CI runs typecheck, lint, unit tests on Node 20 and 22, an Encore build, and a
+`npm run verify` is the one that matters. Three of the four steps passing is
+not a green build — the build step needs Docker running, and it is the step
+most likely to be skipped and most likely to be broken.
+
+### Pre-commit hook
+
+`npm install` points Git at the versioned hooks in [`.githooks/`](.githooks)
+by setting `core.hooksPath`, so the hook arrives with a clone rather than
+having to be installed by hand. That is why there is no Husky here: Husky
+solves the same problem, but `core.hooksPath` needs no dependency, no
+generated wrapper scripts, and no `node_modules` present for Git to find the
+hook. The hooks are ordinary shell scripts you can read and run yourself.
+
+If you cloned before this existed, or `core.hooksPath` got unset:
+
+```bash
+npm run prepare     # git config core.hooksPath .githooks
+```
+
+The hook runs `npm run verify` and blocks the commit if it fails.
+
+**It is bypassable, on purpose:**
+
+```bash
+git commit --no-verify
+```
+
+A blocked commit in the middle of unfinished work is worse than a broken
+commit on a branch — saving work in progress has to stay possible. The gate
+that is not meant to be bypassed is CI, which runs the same checks on the
+pushed branch and cannot be skipped from a developer's machine. If you commit
+with `--no-verify`, run `npm run verify` before you push.
+
+### CI
+
+Typecheck, lint and unit tests on Node 20 and 22; an Encore build; and a
 gitleaks scan over the full history.
 
 ## Licence
