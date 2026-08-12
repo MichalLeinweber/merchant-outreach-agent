@@ -33,6 +33,10 @@ coverage/
 .nyc_output/
 *.lcov
 
+# Browser-automation scratch output: screenshots, console logs and page
+# snapshots written while checking the dashboard by hand.
+.playwright-mcp/
+
 # Python (evals harness)
 __pycache__/
 *.py[cod]

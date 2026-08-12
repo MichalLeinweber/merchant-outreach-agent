@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    The gate strip, at favicon size. Six segments rather than twelve, because
+    twelve would be a grey smear at 16px — but the shape is the same one, and
+    the red segment means what it means everywhere else.
+  -->
+  <rect width="32" height="32" fill="#FFFFFF"/>
+  <rect x="3"  y="7" width="3" height="18" fill="#17694A"/>
+  <rect x="8"  y="7" width="3" height="18" fill="#17694A"/>
+  <rect x="13" y="7" width="3" height="18" fill="#A81E2D"/>
+  <rect x="18" y="7" width="3" height="18" fill="#17694A"/>
+  <rect x="23" y="7" width="3" height="18" fill="#17694A"/>
+  <rect x="28" y="7" width="1.5" height="18" fill="#C7CCD4"/>
+</svg>

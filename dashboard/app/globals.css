@@ -1,0 +1,195 @@
+/*
+ * Design tokens.
+ *
+ * The palette block below is copied verbatim from DESIGN.md. It is not a
+ * starting point to be adjusted — colour in this application carries meaning,
+ * and a colour that appears nowhere in that document has no meaning to carry.
+ * Everything after the palette is derived scaffolding: type, spacing, density.
+ */
+
+:root {
+  /* cool newsprint console */
+  --paper:      #E9EBEE;
+  --surface:    #FFFFFF;
+  --surface-2:  #F3F5F7;
+  --ink:        #14171C;
+  --ink-mute:   #5A626E;
+  --rule:       #C7CCD4;
+
+  /* signal palette — functional, never decorative */
+  --pass:       #17694A;
+  --fail:       #A81E2D;
+  --warn:       #8A5A05;
+  --escalate:   #2C3F9E;
+
+  /* single accent: primary action + focus ring only */
+  --action:     #1B2CC1;
+
+  /* ── Derived: type ─────────────────────────────────────────── */
+
+  /* Display — section headings and uppercase eyebrow labels. */
+  --font-display: "Archivo Variable", "Archivo", system-ui, sans-serif;
+  /* Body — labels and draft prose. */
+  --font-body: "Inter Tight Variable", "Inter Tight", system-ui, sans-serif;
+  /* Data — anything a person would copy or compare down a column. */
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   20px;
+  --text-xl:   27px;
+
+  /* ── Derived: space and density ────────────────────────────── */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Sharp corners throughout. A console is an instrument panel, not a card
+     deck — the only rounding is the 1px that keeps a hairline from looking
+     chipped at its corner. */
+  --radius: 2px;
+
+  --focus-ring: 2px;
+
+  /* The one animation in the application: the gate strip filling as checks
+     run. 40ms per segment, per DESIGN.md. */
+  --gate-segment-step: 40ms;
+  --gate-segment-fill: 120ms;
+}
+
+/* ── Reset ───────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* Aligns figures down a column even outside monospace contexts. */
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  /* "tight tracking" per DESIGN.md */
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── Focus ───────────────────────────────────────────────────── */
+
+/*
+ * A visible focus ring, 2px, in --action. This is the one place besides a
+ * primary button where the accent colour appears.
+ */
+:focus-visible {
+  outline: var(--focus-ring) solid var(--action);
+  outline-offset: 2px;
+}
+
+/* Never remove the ring for keyboard users; only suppress the mouse-click
+   ring that browsers already suppress via :focus-visible. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Shared primitives ───────────────────────────────────────── */
+
+/* Uppercase section label. Display face, because it is a heading in role even
+   when it is four characters long. */
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* Every value someone might copy or compare between rows. */
+.mono {
+  font-family: var(--font-data);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+/* Visually hidden but read by a screen reader. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Motion ──────────────────────────────────────────────────── */
+
+/*
+ * There is exactly one animation in this application and this is the switch
+ * that turns it off. `--gate-segment-step: 0ms` collapses the stagger so the
+ * strip renders in its final state on the first frame.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --gate-segment-step: 0ms;
+    --gate-segment-fill: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

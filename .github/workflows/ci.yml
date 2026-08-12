@@ -95,6 +95,37 @@ jobs:
       - name: Build
         run: encore build docker merchant-outreach-agent:ci --skip-config
 
+  # The dashboard is a separate npm project with its own lockfile, because it is
+  # deployed separately. The root tsconfig excludes it and the root ESLint
+  # config ignores it, so nothing above would catch a break in it.
+  dashboard:
+    name: Dashboard
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: dashboard
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # typecheck && lint && build. The build is the step that matters: it is
+      # what prerenders all forty drafts, and a fixture that violates the
+      # contract throws while it does.
+      - name: Verify
+        run: npm run verify
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
