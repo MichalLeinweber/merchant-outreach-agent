@@ -179,10 +179,10 @@ These are decisions, not omissions:
 
 - [x] **WS0** — contracts, schema, service boundaries, LLM client, CI
 - [ ] **WS1** — synthetic merchant generator, ingest, enrichment
-- [~] **WS2** — triage and draft agents, escalation routing, cost accounting.
-      Code complete; the prompts in
-      [`services/agents/prompts/`](services/agents/prompts) are skeletons and
-      still need writing, so no fixtures are recorded yet.
+- [x] **WS2** — triage and draft agents, escalation routing, cost accounting,
+      prompts written. Fixtures are not recorded yet, so a fixture-mode run
+      still fails with `missing fixture` until `npm run record-fixtures` has
+      been run once against the real models.
 - [ ] **WS3** — gates G01–G12, each with a passing and a failing test
 - [ ] **WS4** — approval queue, state machine, outbox, sender
 - [ ] **WS5** — metrics, dashboard
