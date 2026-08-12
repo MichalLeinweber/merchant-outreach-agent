@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false,
+    // `noImplicitOverride` is deliberately off: encore.dev ships raw .ts
+    // sources rather than only .d.ts files, so `skipLibCheck` does not shield
+    // them and the flag fails the build on a dependency we do not own.
+
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true,
+
+    "paths": {
+      "~encore/*": ["./encore.gen/*"]
+    }
+  },
+  "include": ["services/**/*", "shared/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist", "dashboard", "evals"]
+}

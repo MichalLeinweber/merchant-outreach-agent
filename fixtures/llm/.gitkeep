@@ -1,0 +1,2 @@
+# Recorded model responses live here, one JSON file per prompt hash.
+# Populate with:  ANTHROPIC_API_KEY=... LLM_MODE=record npm run demo

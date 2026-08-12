@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes the previous run on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checks (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Report every failing version rather than stopping at the first.
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          # Enable the npm cache only when a lockfile exists. Setting
+          # `cache: npm` unconditionally fails the job outright in a repository
+          # without one, which would contradict the fallback in the next step.
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      # npm ci requires a lockfile. Fall back so the workflow also works before
+      # the lockfile is committed.
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "::warning::No package-lock.json — falling back to npm install. Commit the lockfile for reproducible builds."
+            npm install
+          fi
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+  # Encore's own parser is the real build gate: it is what catches an invalid
+  # service topology, a bad database declaration, or a malformed migration.
+  # It runs once rather than per Node version, because its result cannot differ
+  # between them.
+  encore-build:
+    name: Encore build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Install the Encore CLI
+        run: |
+          curl -fsSL https://encore.dev/install.sh | bash
+          echo "$HOME/.encore/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: encore build docker merchant-outreach-agent:ci --local
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the full history
+        uses: actions/checkout@v4
+        with:
+          # gitleaks scans commits, not just the working tree. Without the full
+          # history it sees only the latest commit and misses a key that was
+          # committed earlier and deleted later — which is still in the history,
+          # and still compromised.
+          fetch-depth: 0
+
+      - name: Scan for committed secrets
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --redact --verbose
+          # --redact keeps the matched secret out of this public build log.
+          # Without it, a failing scan prints the very thing it just found.
