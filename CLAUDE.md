@@ -27,11 +27,23 @@ were run and reported as "validation passed"; `build` was not run, and it was
 the one that was broken. CI caught it, which is the point of CI — but the
 report that preceded it was wrong.
 
-### When `verify` cannot run
+### What `verify` does not cover
 
-`npm run build` needs Docker running, because Encore builds a container image.
-If Docker is unavailable, say so explicitly and name what is therefore
-unverified. Do not silently drop the step and report the rest as a pass.
+`npm run verify` no longer builds the container image. `npm run build` is
+`tsc --noEmit`; the Encore docker build is `npm run build:docker`, and CI is
+what runs it. The image build takes about fifteen minutes, which is too long
+to sit in front of every commit — but it is also the step that catches an
+invalid service topology or a malformed migration, so it cannot simply be
+dropped. It moved rather than went away.
+
+So a green local `verify` does not mean the Encore build passes. If a change
+touches service topology, a database declaration or a migration, run
+`npm run build:docker` as well and say that you did.
+
+The dashboard is not covered either. It is a separate npm project with its own
+suite: `cd dashboard && npm run verify`. Saying "validation passed" after
+running only the root one is exactly the kind of half-report the section above
+is about.
 
 ## Contracts are frozen
 
