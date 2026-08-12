@@ -1,0 +1,251 @@
+/*
+ * The gate strip.
+ *
+ * Twelve segments, one per gate, in evaluation order. Filled means passed, red
+ * means a blocking failure, amber means a warning, and an empty outline means
+ * evaluation has not reached that gate yet.
+ *
+ * The same component draws all three appearances: a compact bar in a queue row,
+ * a full-size strip with codes and a caption on the draft detail, and a row of
+ * the heatmap on the metrics page. Only the geometry changes between them.
+ */
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  align-items: end;
+}
+
+/* ── Segment ─────────────────────────────────────────────────── */
+
+.segment {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 1px solid var(--rule);
+  background: var(--surface-2);
+  border-radius: 1px;
+  /* The empty outline is the "not run" state, so it is what a segment looks
+     like before anything is drawn inside it. */
+  overflow: hidden;
+}
+
+/* The bar that grows to fill the outline. This is the one animated thing in
+   the application. */
+.fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom;
+  animation: gate-fill var(--gate-segment-fill) linear backwards;
+  animation-delay: calc(var(--segment-index) * var(--gate-segment-step));
+}
+
+@keyframes gate-fill {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.segment[data-state="pass"] .fill {
+  background: var(--pass);
+}
+
+.segment[data-state="fail"] .fill {
+  background: var(--fail);
+}
+
+.segment[data-state="warn"] .fill {
+  background: var(--warn);
+}
+
+/* A pending segment renders no fill at all — the outline is the whole state. */
+.segment[data-state="pending"] {
+  border-style: dashed;
+}
+
+/* Cross-highlight: the segment the operator is pointing at, here or elsewhere
+   on the screen. Drawn as a ring rather than a colour change, because colour
+   here already means something. */
+.segment[data-active="true"] {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+  z-index: 1;
+}
+
+/*
+ * Keyboard focus must stay in --action, and focusing a segment also marks it
+ * active — so without this rule the ink highlight above would win on equal
+ * specificity and swallow the focus ring. Source order decides it; this has to
+ * stay after the rule it overrides.
+ */
+.segment:focus-visible {
+  outline: var(--focus-ring) solid var(--action);
+  outline-offset: 2px;
+  z-index: 2;
+}
+
+/* ── Compact: inside a queue row ─────────────────────────────── */
+
+.compact {
+  width: 118px;
+  gap: 2px;
+}
+
+.compact .segment {
+  height: 15px;
+}
+
+/* ── Cell: one row of the metrics heatmap ────────────────────── */
+
+.cell {
+  width: 100%;
+  gap: 2px;
+}
+
+.cell .segment {
+  height: 22px;
+}
+
+/* ── Full: the draft detail ──────────────────────────────────── */
+
+.full {
+  width: 100%;
+  gap: 3px;
+  grid-template-rows: auto auto auto;
+  row-gap: var(--space-2);
+}
+
+.full .segment {
+  height: 38px;
+  cursor: pointer;
+}
+
+.full .segment:hover {
+  border-color: var(--ink-mute);
+}
+
+/* Row 1: the gate codes, sitting above their segments like the diagram in
+   DESIGN.md. */
+.code {
+  font-family: var(--font-data);
+  font-size: 10px;
+  line-height: 1;
+  text-align: center;
+  color: var(--ink-mute);
+  letter-spacing: -0.02em;
+}
+
+.code[data-active="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Row 3: the pointer that marks which segment the caption is about. */
+.pointer {
+  font-family: var(--font-data);
+  font-size: var(--text-sm);
+  line-height: 1;
+  text-align: center;
+  color: var(--ink);
+}
+
+/* ── Caption ─────────────────────────────────────────────────── */
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding-top: var(--space-1);
+}
+
+.captionGate {
+  font-family: var(--font-data);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.captionGate[data-state="fail"] {
+  color: var(--fail);
+}
+
+.captionGate[data-state="warn"] {
+  color: var(--warn);
+}
+
+.captionGate[data-state="pass"] {
+  color: var(--pass);
+}
+
+.captionGate[data-state="pending"] {
+  color: var(--ink-mute);
+}
+
+.captionDetail {
+  flex: 1 1 240px;
+  font-size: var(--text-sm);
+  color: var(--ink-mute);
+  line-height: 1.45;
+}
+
+/* ── Legend ──────────────────────────────────────────────────── */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-mute);
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 14px;
+  border: 1px solid var(--rule);
+  border-radius: 1px;
+}
+
+.legendSwatch[data-state="pass"] {
+  background: var(--pass);
+  border-color: var(--pass);
+}
+
+.legendSwatch[data-state="fail"] {
+  background: var(--fail);
+  border-color: var(--fail);
+}
+
+.legendSwatch[data-state="warn"] {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+.legendSwatch[data-state="pending"] {
+  background: var(--surface-2);
+  border-style: dashed;
+}
+
+/* Narrow screens: the codes stop fitting long before the segments do, so the
+   codes go and the strip stays. */
+@media (max-width: 480px) {
+  .full .code {
+    display: none;
+  }
+}

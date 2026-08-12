@@ -42,19 +42,28 @@ report that preceded it was wrong.
 
 ### What `verify` does not cover
 
-`verify` stops at typecheck. The container build is `npm run build:docker`,
-which needs Docker and the Encore CLI and is slow. It sits deliberately outside
-`verify` and outside the pre-commit hook, so neither depends on Docker being
-up, and CI runs it as its own job.
+`npm run verify` no longer builds the container image. `npm run build` is
+`tsc --noEmit`; the Encore docker build is `npm run build:docker`, which needs
+Docker and the Encore CLI, and CI is what runs it. The image build takes about
+fifteen minutes, too long to sit in front of every commit — so it sits outside
+both `verify` and the pre-commit hook, and neither depends on a running daemon.
+But it is also the step that catches an invalid service topology or a malformed
+migration, so it cannot simply be dropped. It moved rather than went away.
 
-So a green `verify` does not say the application builds as a container. Nothing
-may claim it did on the strength of `verify`: name the container build as
+So a green local `verify` does not mean the Encore build passes, and nothing may
+claim it did on the strength of `verify`. Name the container build as
 unverified, and let CI be the thing that proves it.
 
-That gap is not theoretical. Encore bundles the whole application into a single
-file, so anything resolving a path relative to its own module works under vitest
-and fails in the image. Any change touching prompts, fixtures, or file paths
-needs `npm run build:docker` before it can be called done.
+That gap is not theoretical, and it is wider than topology and migrations.
+Encore bundles the whole application into a single file, so anything resolving a
+path relative to its own module works under vitest and fails in the image. Run
+`npm run build:docker` — and say that you did — for any change touching service
+topology, a database declaration, a migration, prompts, fixtures, or file paths.
+
+The dashboard is not covered either. It is a separate npm project with its own
+suite: `cd dashboard && npm run verify`. Saying "validation passed" after
+running only the root one is exactly the kind of half-report the section above
+is about.
 
 The same applies to any step you skipped, for any reason. Say which one, and say
 what is therefore unverified. Do not silently drop it and report the rest as a
