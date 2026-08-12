@@ -27,11 +27,19 @@ were run and reported as "validation passed"; `build` was not run, and it was
 the one that was broken. CI caught it, which is the point of CI — but the
 report that preceded it was wrong.
 
-### When `verify` cannot run
+### What `verify` does not cover
 
-`npm run build` needs Docker running, because Encore builds a container image.
-If Docker is unavailable, say so explicitly and name what is therefore
-unverified. Do not silently drop the step and report the rest as a pass.
+`verify` stops at typecheck. The container build is `npm run build:docker`,
+and it runs in CI — locally it is too slow to sit in front of every commit.
+
+That leaves a real gap, so say when it applies rather than reporting a clean
+`verify` as if it settled the question. Encore bundles the application into a
+single file, so anything resolving a path relative to its own module works
+under vitest and fails in the image. Any change touching prompts, fixtures, or
+file paths needs `npm run build:docker` before it can be called done.
+
+If a step could not run at all, name it and name what is therefore unverified.
+Do not drop it silently and report the rest as a pass.
 
 ## Contracts are frozen
 

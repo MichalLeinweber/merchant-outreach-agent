@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsc --noEmit && encore build docker merchant-outreach-agent:local --skip-config",
+    "build": "tsc --noEmit",
+    "build:docker": "tsc --noEmit && encore build docker merchant-outreach-agent:local --skip-config",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "record-fixtures": "encore exec scripts/record-fixtures.ts",
     "dev": "encore run"

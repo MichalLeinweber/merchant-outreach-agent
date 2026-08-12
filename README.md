@@ -174,6 +174,10 @@ These are decisions, not omissions:
   configurable failure rate.
 - **No multi-tenancy.**
 - **No A/B testing of message variants.**
+- **No container build in the local gate.** The Docker build runs in CI;
+  `npm run verify` stops at typecheck, because the first build in a fresh
+  worktree with no Docker layer cache takes over ten minutes. Run it by hand
+  with `npm run build:docker` when you need it.
 
 ## Roadmap
 
@@ -191,17 +195,24 @@ These are decisions, not omissions:
 ## Development
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm run lint        # eslint
-npm run test        # vitest
-npm run build       # typecheck + Encore container build
-npm run verify      # all four, in order
-encore run          # start the app locally
+npm run typecheck     # tsc --noEmit
+npm run lint          # eslint
+npm run test          # vitest
+npm run build         # tsc --noEmit
+npm run verify        # all of the above, in order
+npm run build:docker  # Encore container build — needs Docker, minutes not seconds
+encore run            # start the app locally
 ```
 
-`npm run verify` is the one that matters. Three of the four steps passing is
-not a green build — the build step needs Docker running, and it is the step
-most likely to be skipped and most likely to be broken.
+`npm run verify` is the gate to run before pushing, and reporting a task done
+without it is not allowed here — see [CLAUDE.md](CLAUDE.md). It deliberately
+stops short of the container build: that runs in CI, and locally on demand
+via `npm run build:docker`.
+
+The container build is worth running by hand before anything that changes how
+the app is packaged. It catches a class of bug the unit tests structurally
+cannot — Encore bundles the whole app into one file, so anything that resolves
+a path relative to its own module works under vitest and breaks in the image.
 
 ### Pre-commit hook
 

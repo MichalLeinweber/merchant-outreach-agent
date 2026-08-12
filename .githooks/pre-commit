@@ -15,16 +15,8 @@ set -e
 echo "pre-commit: running npm run verify"
 echo
 
-# `npm run build` shells out to Encore, which builds a container image. Without
-# Docker the step fails with an error about the daemon, which reads like a
-# problem with the commit rather than with the machine. Say what is actually
-# wrong instead.
-if ! docker info >/dev/null 2>&1; then
-	echo "pre-commit: the Docker daemon is not running." >&2
-	echo "            'npm run build' needs it, because Encore builds a container image." >&2
-	echo "            Start Docker, or commit with --no-verify and run 'npm run verify' before you push." >&2
-	exit 1
-fi
+# No Docker check here: `verify` stops at typecheck and needs nothing running.
+# The container build is `npm run build:docker`, and CI is where it has to pass.
 
 if ! npm run verify; then
 	echo >&2
