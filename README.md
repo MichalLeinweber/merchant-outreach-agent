@@ -226,12 +226,19 @@ These are decisions, not omissions:
   configurable failure rate.
 - **No multi-tenancy.**
 - **No A/B testing of message variants.**
+- **No container build in the local gate.** The Docker build runs in CI;
+  `npm run verify` stops at typecheck, because the first build in a fresh
+  worktree with no Docker layer cache takes over ten minutes. Run it by hand
+  with `npm run build:docker` when you need it.
 
 ## Roadmap
 
 - [x] **WS0** — contracts, schema, service boundaries, LLM client, CI
 - [x] **WS1** — synthetic merchant generator, ingest, enrichment
-- [ ] **WS2** — triage and draft agents, escalation routing, cost accounting
+- [x] **WS2** — triage and draft agents, escalation routing, cost accounting,
+      prompts written. Fixtures are not recorded yet, so a fixture-mode run
+      still fails with `missing fixture` until `npm run record-fixtures` has
+      been run once against the real models.
 - [ ] **WS3** — gates G01–G12, each with a passing and a failing test
 - [ ] **WS4** — approval queue, state machine, outbox, sender
 - [ ] **WS5** — metrics, dashboard
@@ -250,10 +257,12 @@ encore run           # start the app locally
 
 npm run generate:merchants   # regenerate the synthetic seed file
 npm run seed                 # load it into a running app via the ingest API
+npm run record-fixtures      # record LLM fixtures (needs an API key)
 ```
 
 `npm run verify` is the one that matters locally, and it is deliberately
-**typecheck, lint and unit tests only**. The Encore container build is a
+**typecheck, lint and unit tests only**. Reporting a task done without it is
+not allowed here — see [CLAUDE.md](CLAUDE.md). The Encore container build is a
 separate script, `npm run build:docker`, and CI runs it as its own job on every
 pull request.
 
@@ -265,7 +274,10 @@ developer's machine.
 
 The consequence is that a green `verify` does not prove the application builds
 as a container — read it as "compiles, lints, unit tests pass" and nothing
-more.
+more. So run `build:docker` by hand before anything that changes how the app is
+packaged. It catches a class of bug the unit tests structurally cannot: Encore
+bundles the whole app into one file, so anything that resolves a path relative
+to its own module works under vitest and breaks in the image.
 
 ### Pre-commit hook
 

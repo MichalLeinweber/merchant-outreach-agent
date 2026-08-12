@@ -40,15 +40,23 @@ were run and reported as "validation passed"; the build was not run, and it was
 the one that was broken. CI caught it, which is the point of CI — but the
 report that preceded it was wrong.
 
-### When a step cannot run
+### What `verify` does not cover
 
-`npm run build:docker` needs Docker and the Encore CLI, and it is slow. It is
-deliberately outside `verify` and outside the pre-commit hook, so neither
-depends on Docker being up. That is also why nothing may claim the container
-build passed on the strength of `verify`: name it as unverified, and let CI be
-the thing that proves it.
+`verify` stops at typecheck. The container build is `npm run build:docker`,
+which needs Docker and the Encore CLI and is slow. It sits deliberately outside
+`verify` and outside the pre-commit hook, so neither depends on Docker being
+up, and CI runs it as its own job.
 
-The same applies to any step you skipped for any reason. Say which one, and say
+So a green `verify` does not say the application builds as a container. Nothing
+may claim it did on the strength of `verify`: name the container build as
+unverified, and let CI be the thing that proves it.
+
+That gap is not theoretical. Encore bundles the whole application into a single
+file, so anything resolving a path relative to its own module works under vitest
+and fails in the image. Any change touching prompts, fixtures, or file paths
+needs `npm run build:docker` before it can be called done.
+
+The same applies to any step you skipped, for any reason. Say which one, and say
 what is therefore unverified. Do not silently drop it and report the rest as a
 pass.
 

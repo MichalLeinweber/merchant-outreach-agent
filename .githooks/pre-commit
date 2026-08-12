@@ -22,6 +22,9 @@ set -e
 echo "pre-commit: running npm run verify"
 echo
 
+# No Docker check here: `verify` stops at typecheck and needs nothing running.
+# The container build is `npm run build:docker`, and CI is where it has to pass.
+
 if ! npm run verify; then
 	echo >&2
 	echo "pre-commit: verify failed — commit blocked." >&2
