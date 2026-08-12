@@ -16,10 +16,11 @@
     "test:watch": "vitest",
     "build": "tsc --noEmit && encore build docker merchant-outreach-agent:local --skip-config",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "record-fixtures": "encore exec scripts/record-fixtures.ts",
     "dev": "encore run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.70.0",
+    "@anthropic-ai/sdk": "^0.116.0",
     "encore.dev": "^1.57.13"
   },
   "devDependencies": {

@@ -15,7 +15,6 @@
 import { createHash } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -26,6 +25,7 @@ import {
   MissingApiKeyError,
   MissingFixtureError,
 } from "../../shared/errors.js";
+import { fromAppRoot } from "../../shared/paths.js";
 import { costUsd } from "./pricing.js";
 
 // ─── Public shapes ─────────────────────────────────────────────
@@ -36,6 +36,12 @@ export interface LlmRequest {
   system: string;
   userPrompt: string;
   maxTokens: number;
+  /**
+   * JSON Schema the response must conform to. When set, the API constrains
+   * the output rather than the prompt asking nicely for JSON, so a parse
+   * failure means a real problem instead of a formatting slip.
+   */
+  jsonSchema?: Record<string, unknown> | undefined;
 }
 
 export interface LlmResult {
@@ -69,8 +75,10 @@ export interface LlmFixture {
 /**
  * Bumped only when the hashed shape changes, which invalidates every fixture
  * at once. Prompt edits do not need this — they change the hash by themselves.
+ *
+ * v2: added `jsonSchema` to the hashed request.
  */
-const FIXTURE_KEY_VERSION = 1;
+const FIXTURE_KEY_VERSION = 2;
 
 /**
  * Stable hash of a request.
@@ -85,19 +93,40 @@ export function computeFixtureKey(request: LlmRequest): string {
     system: request.system,
     userPrompt: request.userPrompt,
     maxTokens: request.maxTokens,
+    // Sorted, so an equivalent schema written in a different key order does
+    // not silently invalidate every recorded fixture.
+    jsonSchema: request.jsonSchema ? stableStringify(request.jsonSchema) : null,
   });
 
   return createHash("sha256").update(canonical, "utf8").digest("hex");
+}
+
+/** JSON with object keys sorted at every depth, so the output is order-independent. */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+
+  const entries = Object.entries(value as Record<string, unknown>)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, val]) => `${JSON.stringify(key)}:${stableStringify(val)}`);
+
+  return `{${entries.join(",")}}`;
 }
 
 // ─── Configuration ─────────────────────────────────────────────
 
 const VALID_MODES: readonly LlmMode[] = ["live", "record", "fixture"];
 
-/** Repository root, derived from this file so the cwd does not matter. */
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-
-export const DEFAULT_FIXTURE_DIR = path.join(REPO_ROOT, "fixtures", "llm");
+/**
+ * Where recorded responses live.
+ *
+ * Resolved from the app root rather than from this module's own location:
+ * Encore bundles the application into a single file, so a path derived from
+ * `import.meta.url` would point next to the bundle. See `shared/paths.ts`.
+ */
+export function defaultFixtureDir(): string {
+  return fromAppRoot("fixtures", "llm");
+}
 
 /**
  * Read the client configuration from the environment.
@@ -122,7 +151,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClie
 
   return {
     mode,
-    fixtureDir: env.LLM_FIXTURE_DIR ?? DEFAULT_FIXTURE_DIR,
+    fixtureDir: env.LLM_FIXTURE_DIR ?? defaultFixtureDir(),
     apiKey,
   };
 }
@@ -275,6 +304,13 @@ export class LlmClient {
       max_tokens: request.maxTokens,
       system: request.system,
       messages: [{ role: "user", content: request.userPrompt }],
+      ...(request.jsonSchema
+        ? {
+            output_config: {
+              format: { type: "json_schema" as const, schema: request.jsonSchema },
+            },
+          }
+        : {}),
     });
 
     const latencyMs = this.now() - startedAt;

@@ -67,6 +67,59 @@ export class MissingApiKeyError extends AppError {
   }
 }
 
+/** A prompt file is missing, malformed, or rendered with a value it does not have. */
+export class PromptError extends AppError {
+  readonly code = "PROMPT";
+
+  constructor(
+    readonly promptName: string,
+    detail: string,
+    options?: { cause?: unknown },
+  ) {
+    super(`Prompt "${promptName}" ${detail}`, options);
+  }
+}
+
+/**
+ * A draft claimed something its own body does not contain.
+ *
+ * `EvidenceRef.claim` must be an exact substring of `body`. This is the core
+ * defence against a confidently invented detail: the model has to point at
+ * the words it used. A near-match is still a failure — the draft is rejected
+ * rather than repaired, because silently repairing it would hide how often
+ * the model gets this wrong, and that rate is the thing worth measuring.
+ */
+export class EvidenceNotGroundedError extends AppError {
+  readonly code = "EVIDENCE_NOT_GROUNDED";
+
+  constructor(
+    readonly merchantId: string,
+    readonly ungroundedClaims: string[],
+  ) {
+    const shown = ungroundedClaims
+      .map((claim) => `  - ${JSON.stringify(claim)}`)
+      .join("\n");
+
+    super(
+      `Draft for merchant ${merchantId} lists ${ungroundedClaims.length} evidence ` +
+        `claim(s) that do not appear verbatim in the body:\n${shown}\n` +
+        `Rejecting the draft rather than repairing it.`,
+    );
+  }
+}
+
+/** A configuration value is missing or outside its permitted range. */
+export class ConfigError extends AppError {
+  readonly code = "CONFIG";
+
+  constructor(
+    readonly variable: string,
+    detail: string,
+  ) {
+    super(`Configuration value ${variable} ${detail}`);
+  }
+}
+
 /** The model returned something that does not match the expected schema. */
 export class LlmResponseError extends AppError {
   readonly code = "LLM_RESPONSE";
