@@ -91,7 +91,10 @@ export async function saveDraft(draft: OutreachDraft): Promise<void> {
       input_tokens, output_tokens, cached_input_tokens, cost_usd, created_at
     ) VALUES (
       ${draft.id}, ${draft.merchantId}, ${draft.campaignId}, ${draft.locale},
-      ${draft.subject}, ${draft.body}, ${JSON.stringify(draft.evidence)}, ${draft.model},
+      -- Same cast, same reason as in ingest: the driver binds a JS string as a
+      -- jsonb value, so without ::text the evidence is stored as a jsonb
+      -- string and drafts_evidence_is_array rejects the row.
+      ${draft.subject}, ${draft.body}, (${JSON.stringify(draft.evidence)}::text)::jsonb, ${draft.model},
       ${draft.usage.inputTokens}, ${draft.usage.outputTokens},
       ${draft.usage.cachedInputTokens}, ${draft.usage.costUsd}, ${draft.createdAt}
     )

@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "encore test --config vitest.integration.config.ts",
     "build": "tsc --noEmit",
     "build:docker": "tsc --noEmit && encore build docker merchant-outreach-agent:local --skip-config",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
