@@ -17,7 +17,7 @@ npm run verify   # typecheck && lint && test && build (build == tsc --noEmit)
 |---|---|
 | `tsc --noEmit` (twice: as `typecheck` and as `build`) | **The Encore container build** — `npm run build:docker`, which needs Docker and the Encore CLI. CI runs it as its own job. |
 | `eslint .` | **The dashboard** — `dashboard/` is a separate Next.js application with its own build, outside this workspace. |
-| `vitest run` — unit tests, no database | **Anything needing Postgres.** The unit suite never touches the database, so SQL in the service layer is typechecked but not executed. |
+| `vitest run` — unit tests, no database | **Anything needing Postgres.** The unit suite never touches the database, so SQL in the service layer is typechecked but not executed. That is what `npm run test:integration` is for, and `verify` does not run it. |
 
 A green `verify` therefore means "this compiles, lints and its unit tests
 pass". It does not mean the application builds as a container, and it does not
@@ -68,6 +68,43 @@ is about.
 The same applies to any step you skipped, for any reason. Say which one, and say
 what is therefore unverified. Do not silently drop it and report the rest as a
 pass.
+
+## The integration suite
+
+```bash
+npm run test:integration   # encore test --config vitest.integration.config.ts
+```
+
+This is the suite that runs the SQL. `encore test` provisions a test database,
+applies the migrations and then runs vitest over `**/*.integration.test.ts` —
+files the unit config excludes, because they import `shared/db.ts`, which
+throws on import when the Encore runtime is not there. The split is enforced by
+that, not by convention: a database test cannot accidentally end up in the unit
+run.
+
+| Covered | Not covered |
+|---|---|
+| Endpoints end to end against real Postgres, including how the driver binds parameters | **The container build.** Still `npm run build:docker`, still CI's job. `encore test` compiles and boots the app, which is evidence the topology parses — it is not evidence the image builds. |
+| The constraints and indexes that carry a rule, by exercising the code that trips them | **The dashboard.** Unchanged: `cd dashboard && npm run verify`. |
+| Whatever a service adds a test for; the suite grows with the workstreams | **Anything needing an API key.** No live model calls; the LLM stays in fixture mode. |
+
+Needs Docker running, which is why it is not in the pre-commit hook. It takes
+seconds, not the fifteen minutes the image build takes, so there is no excuse
+for skipping it when a change touches SQL.
+
+**Run it for any change that writes to the database, and say that you did.**
+The gap it closes is real and was not hypothetical: `enrichments.signals` and
+`drafts.evidence` were both written with `${JSON.stringify(value)}::jsonb`,
+which typechecks, passes the unit suite, and fails against Postgres every
+time — the driver binds a JS string as a jsonb value in its own right, so the
+column ended up holding a jsonb *string* and the `jsonb_typeof(...) = 'array'`
+constraint rejected the row. Ingest and every draft write were broken in `main`
+and nothing caught it, because nothing ran them. Write jsonb as
+`(${JSON.stringify(value)}::text)::jsonb`.
+
+`verify` and `test:integration` are two separate claims. "Validation passed"
+means `verify`; it says nothing about the database. Name both, or name the one
+you ran and say the other is unverified.
 
 ## Contracts are frozen
 

@@ -111,9 +111,15 @@ export const ingestMerchants = api(
         const signals: MerchantSignal[] = deriveSignals(merchant, { now: enrichedAt });
         signalsWritten += signals.length;
 
+        // The cast through ::text is not decoration. The Encore driver binds a
+        // JS string as a jsonb value in its own right, so a plain ::jsonb
+        // stores the JSON *text* as a jsonb string — which is not an array,
+        // and `enrichments_signals_is_array` rejects the whole batch. Going
+        // through ::text makes Postgres parse it into the array the column is
+        // declared to hold.
         await tx.exec`
           INSERT INTO enrichments (merchant_id, signals, enriched_at)
-          VALUES (${merchant.id}, ${JSON.stringify(signals)}::jsonb, ${enrichedAt.toISOString()}::timestamptz)
+          VALUES (${merchant.id}, (${JSON.stringify(signals)}::text)::jsonb, ${enrichedAt.toISOString()}::timestamptz)
           ON CONFLICT (merchant_id) DO UPDATE SET
             signals     = EXCLUDED.signals,
             enriched_at = EXCLUDED.enriched_at
