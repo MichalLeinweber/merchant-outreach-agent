@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-08-13T03:52:13+00:00",
+  "commit": "cbdc2e7",
+  "corpus": {
+    "golden_merchants": 30,
+    "drafts": 20,
+    "draft_source": "hand-written fixtures, not model output"
+  },
+  "metrics": {
+    "gate_pass_rate": 0.938462,
+    "hallucination_rate": 0.3,
+    "blocked_rate": 0.55,
+    "triage_accuracy": null,
+    "judge_mean": {
+      "personalization": null,
+      "faithfulness": null,
+      "tone": null,
+      "actionability": null
+    },
+    "cost_per_draft_usd": null
+  },
+  "unavailable": {
+    "triage_accuracy": "no golden case has an expected_bucket yet - label them in evals/datasets/golden.jsonl",
+    "judge_mean": "Missing judge fixture '340af92985e0d28093c70b13a2eef40ae8ef15219d150069da13c5f4a2c1f180'.",
+    "cost_per_draft_usd": "the draft corpus is hand-written; cost is only meaningful for a live run"
+  },
+  "notes": "Recorded by evals/record_baseline.py. Metrics that are null have never been measured; the regression gate reports them as not established rather than as a pass. Move a number only with an explanation in the pull request."
+}

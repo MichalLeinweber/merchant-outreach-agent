@@ -126,6 +126,56 @@ jobs:
       - name: Verify
         run: npm run verify
 
+  # WS6: the eval suite. A separate job because it is a separate language and a
+  # separate claim — `npm run verify` says the pipeline compiles and its unit
+  # tests pass; this says the gates still catch what they are supposed to catch
+  # and no metric has regressed past its tolerance.
+  #
+  # It never calls a model. `test_gates.py` and `test_grounding.py` run on
+  # fixtures by construction, and `test_triage.py` and `judge.py` run in
+  # `fixture` mode, replaying recorded responses. The live run is a separate,
+  # manually triggered workflow with a cost cap: evals-live.yml.
+  evals:
+    name: Evals (WS6)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # The suite measures the real gates by running them, so it needs Node and
+      # the repository's dependencies — not a Python re-implementation that
+      # would drift from the thing it is supposed to be measuring.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install Node dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: evals/uv.lock
+
+      # --frozen: the lockfile is committed, and an eval run that quietly
+      # resolved a different pytest is a run whose result is not reproducible.
+      - name: Install Python dependencies
+        working-directory: evals
+        run: uv sync --frozen
+
+      - name: Run the eval suite
+        working-directory: evals
+        run: uv run pytest
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

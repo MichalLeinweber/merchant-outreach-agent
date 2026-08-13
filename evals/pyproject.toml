@@ -1,0 +1,34 @@
+[project]
+name = "moa-evals"
+version = "0.1.0"
+description = "WS6 — the eval suite for merchant-outreach-agent: golden set, gate coverage, grounding rate, LLM-as-judge and the regression gate."
+requires-python = ">=3.11"
+
+# No runtime dependencies on purpose. The suite runs the real gates through a
+# Node bridge and reads JSON; nothing here needs a package to do that, and a
+# suite that installs nothing is a suite that cannot break on an install.
+dependencies = []
+
+[project.optional-dependencies]
+# Only the live judge needs an SDK, and only the manual workflow runs it.
+# `uv sync --extra live` installs it; CI never does.
+live = ["anthropic>=0.116.0"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.uv]
+# This is a test suite, not a library: nothing imports it, so there is nothing
+# to build or install. Without this uv would look for a build backend.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+# `-ra` prints the reason for every skip. The suite skips deliberately — an
+# unlabelled golden set, a missing LLM fixture — and a skip whose reason is
+# invisible is indistinguishable from a test that never existed.
+addopts = "-ra"
+markers = [
+    "fixtures: needs recorded LLM fixtures; skipped with a named command when they are absent",
+    "labels: needs human labels in the dataset; skipped until they are filled in",
+]

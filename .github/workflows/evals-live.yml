@@ -1,0 +1,110 @@
+# The live eval run.
+#
+# Everything in ci.yml runs offline against recorded responses. This workflow
+# is the one that spends money, and it is deliberately not part of that:
+#
+#   * it runs only when somebody presses the button (workflow_dispatch),
+#   * it takes a cost cap, checked before every model call, and stops at it,
+#   * it uploads what it recorded as an artifact rather than committing it,
+#     so a human reviews the fixtures before they become the thing CI replays.
+#
+# Keeping it out of the pull-request path is a decision, not an oversight. A
+# live model call on every push makes the cost of the suite proportional to
+# how often people push, makes every run non-deterministic, and puts an API
+# key in the blast radius of every fork's pull request.
+name: Evals (live)
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_cost_usd:
+        description: "Hard ceiling on model spend for this run, in USD"
+        required: true
+        default: "0.50"
+      what:
+        description: "Which part to run"
+        required: true
+        default: triage
+        type: choice
+        options:
+          - triage
+          - judge
+          - both
+      limit:
+        description: "Only the first N golden merchants (blank = all 30)"
+        required: false
+        default: ""
+
+# One live run at a time. Two concurrent runs would both spend against the same
+# budget while each believes it is the only one.
+concurrency:
+  group: evals-live
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: Live eval run (cap $${{ inputs.max_cost_usd }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: evals/uv.lock
+
+      # The judge calls the API from Python, so it needs the SDK. The offline
+      # suite does not, which is why it is an optional extra rather than a
+      # dependency.
+      - name: Install Python dependencies
+        working-directory: evals
+        run: uv sync --frozen --extra live
+
+      - name: Record triage fixtures
+        if: inputs.what == 'triage' || inputs.what == 'both'
+        working-directory: evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          uv run python record_triage_fixtures.py \
+            --max-cost-usd "${{ inputs.max_cost_usd }}" \
+            ${{ inputs.limit != '' && format('--limit {0}', inputs.limit) || '' }}
+
+      - name: Score the calibration set
+        if: inputs.what == 'judge' || inputs.what == 'both'
+        working-directory: evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          uv run python judge.py calibrate \
+            --mode record \
+            --max-cost-usd "${{ inputs.max_cost_usd }}"
+
+      # Uploaded, not committed. Recorded responses change what every later CI
+      # run replays, so they go through a pull request a person reads — the
+      # same rule as moving the baseline.
+      - name: Upload what was recorded
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-fixtures-and-reports
+          path: |
+            evals/fixtures/**
+            evals/reports/**
+          if-no-files-found: warn
+          retention-days: 14
