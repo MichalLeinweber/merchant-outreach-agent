@@ -85,8 +85,9 @@ run.
 | Covered | Not covered |
 |---|---|
 | Endpoints end to end against real Postgres, including how the driver binds parameters | **The container build.** Still `npm run build:docker`, still CI's job. `encore test` compiles and boots the app, which is evidence the topology parses — it is not evidence the image builds. |
-| The constraints and indexes that carry a rule, by exercising the code that trips them | **The dashboard.** Unchanged: `cd dashboard && npm run verify`. |
-| Whatever a service adds a test for; the suite grows with the workstreams | **Anything needing an API key.** No live model calls; the LLM stays in fixture mode. |
+| The constraints and indexes that carry a rule: `uq_attempt_sent`, `uq_attempt_dedup`, `uq_outbox_attempt`, the `CHECK`s | **The dashboard.** Unchanged: `cd dashboard && npm run verify`. |
+| Concurrency: two approvals racing, two workers on one outbox, `FOR UPDATE SKIP LOCKED` | **Anything needing an API key.** No live model calls; the LLM stays in fixture mode. |
+| The five idempotency tests from `docs/idempotency.md`, which exist nowhere else — they are about what the database does, not what the code says | |
 
 Needs Docker running, which is why it is not in the pre-commit hook. It takes
 seconds, not the fifteen minutes the image build takes, so there is no excuse
