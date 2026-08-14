@@ -40,7 +40,12 @@ const DEFAULTS = {
   escalationModel: "claude-sonnet-5",
   draftModel: "claude-sonnet-5",
   triageMaxTokens: 1024,
-  draftMaxTokens: 2048,
+  // 4096 rather than 2048: a draft in a non-English locale spends noticeably
+  // more tokens on the same text, and at 2048 the cs-CZ and es-ES cases hit
+  // `max_tokens` and were thrown away as truncated. The ceiling is a guard
+  // against a runaway response, not a length target — a draft that passes
+  // G02 is a hundred-odd words either way.
+  draftMaxTokens: 4096,
 } as const satisfies Partial<AgentsConfig>;
 
 export function loadAgentsConfig(env: NodeJS.ProcessEnv = process.env): AgentsConfig {

@@ -77,6 +77,30 @@ export function allRegexSpans(text: string, patterns: readonly RegExp[]): TextSp
   return patterns.flatMap((pattern) => regexSpans(text, pattern));
 }
 
+/**
+ * A phrase bounded by non-letters, matched case-insensitively.
+ *
+ * `\b` cannot be used for this outside English. It is defined in terms of
+ * `\w`, which is `[A-Za-z0-9_]` — and stays that way even under the `u` flag.
+ * So `/\baquí\b/u` does not match "aquí": the final `í` is not a word
+ * character, so there is no word boundary after it to assert. The same trap
+ * catches "zájem", "grüße" and every other word ending in an accented letter,
+ * and it fails *silently* — the pattern simply never matches, and a gate that
+ * never fires looks exactly like a gate with nothing to report.
+ *
+ * `\p{L}` is every letter in every script, so the lookarounds below mean what
+ * `\b` was supposed to mean. `source` is spliced in as a pattern, not escaped,
+ * so callers can pass alternations: `wordPattern("odpov(ěz|ězte)")`.
+ */
+export function wordPattern(source: string): RegExp {
+  return new RegExp(`(?<!\\p{L})(?:${source})(?!\\p{L})`, "iu");
+}
+
+/** `wordPattern` over a list, for the vocabulary lists the gates are built from. */
+export function wordPatterns(sources: readonly string[]): RegExp[] {
+  return sources.map(wordPattern);
+}
+
 /** The substrings a set of spans covers, for use in a failure message. */
 export function textOfSpans(text: string, spans: readonly TextSpan[]): string[] {
   return spans.map((span) => text.slice(span.start, span.end));

@@ -1,13 +1,13 @@
 {
-  "recorded_at": "2026-08-13T03:52:13+00:00",
-  "commit": "cbdc2e7",
+  "recorded_at": "2026-08-14T03:40:59+00:00",
+  "commit": "f5768df",
   "corpus": {
     "golden_merchants": 30,
     "drafts": 20,
     "draft_source": "hand-written fixtures, not model output"
   },
   "metrics": {
-    "gate_pass_rate": 0.938462,
+    "gate_pass_rate": 0.95,
     "hallucination_rate": 0.3,
     "blocked_rate": 0.55,
     "triage_accuracy": null,

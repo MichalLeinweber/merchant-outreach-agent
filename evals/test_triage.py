@@ -39,8 +39,8 @@ REQUIRED_EDGE_CASES = {
 VALID_BUCKETS = {"pursue", "skip", "needs_human"}
 
 RECORD_COMMAND = (
-    "ANTHROPIC_API_KEY=... uv run python record_triage_fixtures.py\n"
-    "  (or run the `Evals (live)` workflow, which does it with a cost cap)"
+    "uv run python record_fixtures.py triage --max-cost-usd 2\n"
+    "  (reads the key from .env.local; or run the `Evals (live)` workflow)"
 )
 
 
@@ -182,14 +182,29 @@ def _require_fixtures(triage_run: dict[str, Any], ids: list[str]) -> dict[str, s
 
 
 def test_triage_ran_offline(triage_run: dict[str, Any]) -> None:
-    """Whatever else happened, no money was spent.
+    """Whatever else happened, nothing reached the network.
 
     This one does not skip. It is the assertion that keeps the promise in
     EVALS.md — that this file runs in CI against recorded responses — and it
     holds whether or not any fixture exists.
+
+    It checks the mode each call reports, not the money it accounts for.
+    `LlmClient.replayFixture` deliberately prices a replayed call from the
+    tokens stored in its fixture, so an offline run reports what the campaign
+    *would* have cost; that figure is the point of recording usage, and it is
+    non-zero as soon as a single fixture exists. Asserting it was zero passed
+    only while there were no fixtures at all — every merchant failed with
+    MISSING_FIXTURE, nothing was charged, and the test proved nothing.
     """
-    assert triage_run["spentUsd"] == 0, (
-        "A run in fixture mode reported spend, which means it reached a model."
+    live = [
+        (entry["merchantId"], call["mode"])
+        for entry in triage_run["results"]
+        for call in entry.get("calls") or []
+        if call["mode"] != "fixture"
+    ]
+    assert not live, (
+        f"{len(live)} call(s) ran in a mode other than `fixture`, which means "
+        f"the suite reached a model: {live[:5]}"
     )
 
 

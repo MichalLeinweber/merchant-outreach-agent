@@ -1,0 +1,28 @@
+title = "merchant-outreach-agent"
+
+# Every rule in the default gitleaks config still applies. This file adds one
+# narrow exception and nothing else — no rule is disabled.
+[extend]
+useDefault = true
+
+# The recorded LLM fixtures are keyed by a SHA-256 hash of the request
+# (see `computeFixtureKey` in services/agents/llm.ts). A 64-character hex
+# string on a line whose key ends in "Key" is exactly what `generic-api-key`
+# looks for, and its entropy is genuinely high — so all 46 fixtures were
+# reported as leaked credentials the first time they were committed.
+#
+# The exception is deliberately as small as it can be, because a fixture is a
+# recorded request and response and is precisely the kind of file a key could
+# end up in by accident. It is scoped three ways at once, all of which must
+# hold: the rule, the shape of the line, and the path. Anything else in these
+# files — a key in a prompt, a token echoed back in a response, a high-entropy
+# string on any other line — still fails the scan.
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Fixture keys are content hashes of a request, not credentials."
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''"fixtureKey": "[a-f0-9]{64}",?''']
+  paths = ['''evals/fixtures/llm/[a-f0-9]{64}\.json''']

@@ -46,6 +46,11 @@ NODE_FLAGS = ["--experimental-transform-types", "--import", TS_RESOLVER.as_uri()
 
 DEFAULT_TIMEOUT_SECONDS = 300
 
+# A live run is thirty sequential model calls, so it gets a longer rope than an
+# offline replay. Long enough to finish, short enough that a wedged call is
+# still a failure rather than a hang.
+LIVE_TIMEOUT_SECONDS = 1800
+
 
 class BridgeError(RuntimeError):
     """The bridge could not be run, or did not answer with usable JSON."""
@@ -110,6 +115,57 @@ def call_bridge(
         ) from error
 
 
+def load_env_file(path: Path | None = None) -> dict[str, str]:
+    """Read `KEY=value` pairs out of `.env.local`.
+
+    The recording scripts need an API key, and this repository's rule is that
+    a key lives in `.env.local` and nowhere else — not in a commit, not in a
+    chat, not in a shell history. The file is gitignored; this reads it and
+    hands the values straight to a subprocess environment.
+
+    Deliberately minimal: no export syntax, no interpolation, no logging of
+    what it found. Returns an empty dict when the file does not exist, because
+    in CI it does not and should not.
+    """
+    path = path or (REPO_ROOT / ".env.local")
+    if not path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, _, value = stripped.partition("=")
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def api_key() -> str | None:
+    """The API key, from the environment or from `.env.local`.
+
+    Returned, never printed. The recording scripts pass it straight into the
+    subprocess environment; nothing logs it, and nothing writes it anywhere.
+    """
+    return os.environ.get("ANTHROPIC_API_KEY") or load_env_file().get("ANTHROPIC_API_KEY")
+
+
+def configured_cost_cap(default: float) -> float:
+    """`CAMPAIGN_COST_CAP_USD` from `.env.local`, or the caller's default."""
+    raw = os.environ.get("CAMPAIGN_COST_CAP_USD") or load_env_file().get(
+        "CAMPAIGN_COST_CAP_USD"
+    )
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError as error:
+        raise BridgeError(
+            f"CAMPAIGN_COST_CAP_USD is {raw!r}, which is not a number. A typo in a "
+            f"cost cap is the kind of thing that is noticed on the invoice."
+        ) from error
+
+
 def fetch_meta() -> dict[str, Any]:
     """Gate metadata, limits, pricing and the passing sample draft."""
     return call_bridge({"command": "meta"})
@@ -123,6 +179,37 @@ def run_gates(cases: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {entry["id"]: entry["report"] for entry in answer["results"]}
 
 
+def _run_agent(
+    command: str,
+    merchants: list[dict[str, Any]],
+    *,
+    campaign_id: str,
+    now: str,
+    mode: str,
+    fixture_dir: Path,
+    max_cost_usd: float | None,
+    api_key: str | None,
+) -> dict[str, Any]:
+    request: dict[str, Any] = {
+        "command": command,
+        "merchants": merchants,
+        "campaignId": campaign_id,
+        "now": now,
+    }
+    if max_cost_usd is not None:
+        request["maxCostUsd"] = max_cost_usd
+
+    env = {"LLM_MODE": mode, "LLM_FIXTURE_DIR": str(fixture_dir)}
+    if api_key:
+        env["ANTHROPIC_API_KEY"] = api_key
+
+    # A live run can be slow: thirty merchants, sequentially, on a model that
+    # thinks. The offline default of five minutes is not enough for that.
+    timeout = DEFAULT_TIMEOUT_SECONDS if mode == "fixture" else LIVE_TIMEOUT_SECONDS
+
+    return call_bridge(request, env=env, timeout=timeout)
+
+
 def run_triage(
     merchants: list[dict[str, Any]],
     *,
@@ -131,6 +218,7 @@ def run_triage(
     mode: str = "fixture",
     fixture_dir: Path = FIXTURE_DIR,
     max_cost_usd: float | None = None,
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     """Triage every merchant through the real agent.
 
@@ -138,16 +226,41 @@ def run_triage(
     a model. A merchant with no recorded response comes back as an entry with
     `ok: false`; see `test_triage.py` for what the suite does about it.
     """
-    request: dict[str, Any] = {
-        "command": "triage",
-        "merchants": merchants,
-        "campaignId": campaign_id,
-        "now": now,
-    }
-    if max_cost_usd is not None:
-        request["maxCostUsd"] = max_cost_usd
+    return _run_agent(
+        "triage",
+        merchants,
+        campaign_id=campaign_id,
+        now=now,
+        mode=mode,
+        fixture_dir=fixture_dir,
+        max_cost_usd=max_cost_usd,
+        api_key=api_key,
+    )
 
-    return call_bridge(
-        request,
-        env={"LLM_MODE": mode, "LLM_FIXTURE_DIR": str(fixture_dir)},
+
+def run_drafts(
+    merchants: list[dict[str, Any]],
+    *,
+    campaign_id: str = "eval_golden",
+    now: str,
+    mode: str = "fixture",
+    fixture_dir: Path = FIXTURE_DIR,
+    max_cost_usd: float | None = None,
+    api_key: str | None = None,
+) -> dict[str, Any]:
+    """Draft for every merchant through the real agent.
+
+    A draft whose evidence does not appear verbatim in its own body is thrown
+    away by the agent, not patched up, and comes back here as an entry with
+    `ok: false`. That is the pipeline working.
+    """
+    return _run_agent(
+        "drafts",
+        merchants,
+        campaign_id=campaign_id,
+        now=now,
+        mode=mode,
+        fixture_dir=fixture_dir,
+        max_cost_usd=max_cost_usd,
+        api_key=api_key,
     )
