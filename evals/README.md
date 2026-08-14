@@ -52,7 +52,7 @@ evals/
 ├── test_baseline.py        the regression gate — this is what fails a build
 ├── judge.py                LLM-as-judge and the calibration report
 ├── record_baseline.py      writes baseline.json from an actual run
-└── record_triage_fixtures.py   the only script that spends money
+└── record_fixtures.py       the only script that spends money
 ```
 
 ## Why a Node bridge
@@ -124,7 +124,7 @@ and the same code starts reporting a number about the model.
 #    in datasets/golden.jsonl to pursue | skip | needs_human.
 
 # 2. Record the triage responses, once, with a cap:
-ANTHROPIC_API_KEY=... uv run python record_triage_fixtures.py --max-cost-usd 0.50
+uv run python record_fixtures.py both --max-cost-usd 2   # key from .env.local
 
 # 3. Score the ten calibration drafts by hand in datasets/calibration.jsonl,
 #    then record the judge and read the agreement report:

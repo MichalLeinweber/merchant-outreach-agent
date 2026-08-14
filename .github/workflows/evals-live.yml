@@ -75,13 +75,13 @@ jobs:
         working-directory: evals
         run: uv sync --frozen --extra live
 
-      - name: Record triage fixtures
+      - name: Record triage and draft fixtures
         if: inputs.what == 'triage' || inputs.what == 'both'
         working-directory: evals
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          uv run python record_triage_fixtures.py \
+          uv run python record_fixtures.py both \
             --max-cost-usd "${{ inputs.max_cost_usd }}" \
             ${{ inputs.limit != '' && format('--limit {0}', inputs.limit) || '' }}
 

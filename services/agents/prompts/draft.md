@@ -69,7 +69,17 @@ This looks supported and is not. The record says 4.6, not 5.0, and says three ye
 
 **One call to action, exactly one.** Close with a link inviting them to register interest, after which someone from the team will get in touch. Do not also ask them to reply, and do not ask for a meeting — a first email should ask for the smallest possible commitment.
 
-**Subject line.** At most 60 characters. It should say what the email is about, not tease. A subject that promises more than the body delivers is the fastest way to be marked as spam.
+**The registration link is always exactly this:**
+
+```
+https://partners.example.invalid/register
+```
+
+Copy it character for character. Do not alter it, do not add query parameters, do not substitute a different host, and never invent one. It is the only URL that may appear in the body, and any other link is treated as contact data the merchant record does not hold — the draft is rejected for it. If you find yourself writing a plausible-looking address of your own, that is the mistake this rule exists to stop.
+
+**Subject line.** It must come in **under 60 characters**, and you should be aiming for about 50. The limit is hard: a subject of 61 characters is not a slightly long subject, it is a rejected draft, and the whole message is discarded over it. Count the characters before you settle on one, and if it is close, cut a word — the margin costs you nothing and running out of it costs the entire draft.
+
+It should say what the email is about, not tease. A subject that promises more than the body delivers is the fastest way to be marked as spam.
 
 <!-- user -->
 

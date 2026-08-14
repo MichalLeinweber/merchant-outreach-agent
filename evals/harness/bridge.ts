@@ -32,12 +32,19 @@
  *     the suite reports which merchants have no fixture and skips the metric,
  *     which is a louder failure than a stack trace naming only the first one.
  *
+ *   {"command":"drafts","merchants":[…],"campaignId":…,"now":…,"maxCostUsd":…}
+ *     The same for the draft agent. Ids and timestamps are injected rather
+ *     than generated, so recording the same merchant twice produces the same
+ *     draft object and a fixture diff shows a change in the model's output
+ *     rather than a new UUID.
+ *
  * Run it as:
  *   node --import ./evals/harness/ts-resolve.mjs evals/harness/bridge.ts
  */
 
 import { loadAgentsConfig } from "../../services/agents/config.js";
 import { createCostGuard, UNLIMITED_COST_GUARD } from "../../services/agents/cost.js";
+import { runDraft, type DraftDeps } from "../../services/agents/draft.js";
 import { LlmClient, loadConfigFromEnv } from "../../services/agents/llm.js";
 import { MODEL_PRICING } from "../../services/agents/pricing.js";
 import type { AgentDeps } from "../../services/agents/runner.js";
@@ -76,7 +83,7 @@ interface GateCase {
 }
 
 interface Request {
-  command: "meta" | "gates" | "triage";
+  command: "meta" | "gates" | "triage" | "drafts";
   cases?: GateCase[];
   merchants?: Merchant[];
   campaignId?: string;
@@ -128,36 +135,51 @@ function gates(cases: GateCase[]): unknown {
   };
 }
 
-async function triage(request: Request): Promise<unknown> {
-  const merchants = request.merchants ?? [];
+/**
+ * Everything both agents need, plus a running total of what they have spent.
+ *
+ * Spend is summed here rather than read from a database: the eval harness has
+ * no campaign row to read. The cap still applies before every call, so a live
+ * run stops at the ceiling instead of discovering it on the invoice.
+ */
+function agentRun(request: Request): {
+  deps: AgentDeps;
+  spent: () => number;
+  charge: (usd: number) => void;
+} {
   const campaignId = request.campaignId ?? "eval";
-  const now = request.now === undefined ? undefined : new Date(request.now);
-
-  const config = loadAgentsConfig();
-  const llm = new LlmClient(loadConfigFromEnv());
-
-  // Spend is summed here rather than read from a database: the eval harness
-  // has no campaign row to read. The cap still applies before every call, so
-  // a live run stops at the ceiling instead of discovering it on the invoice.
   let spentUsd = 0;
+
   const costGuard =
     request.maxCostUsd === undefined
       ? UNLIMITED_COST_GUARD
       : createCostGuard(campaignId, request.maxCostUsd, async () => spentUsd);
 
-  const deps: AgentDeps = { llm, config, costGuard };
+  return {
+    deps: { llm: new LlmClient(loadConfigFromEnv()), config: loadAgentsConfig(), costGuard },
+    spent: () => spentUsd,
+    charge: (usd: number) => {
+      spentUsd += usd;
+    },
+  };
+}
+
+/** The merchant as the agents see it: the record plus its derived signals. */
+function enrich(merchant: Merchant, now: Date | undefined): EnrichedMerchant {
+  return { ...merchant, signals: deriveSignals(merchant, now === undefined ? {} : { now }) };
+}
+
+async function triage(request: Request): Promise<unknown> {
+  const campaignId = request.campaignId ?? "eval";
+  const now = request.now === undefined ? undefined : new Date(request.now);
+  const { deps, spent, charge } = agentRun(request);
 
   const results = [];
 
-  for (const merchant of merchants) {
-    const enriched: EnrichedMerchant = {
-      ...merchant,
-      signals: deriveSignals(merchant, now === undefined ? {} : { now }),
-    };
-
+  for (const merchant of request.merchants ?? []) {
     try {
-      const outcome = await runTriage(enriched, campaignId, deps);
-      spentUsd += outcome.result.usage.costUsd;
+      const outcome = await runTriage(enrich(merchant, now), campaignId, deps);
+      charge(outcome.result.usage.costUsd);
       results.push({
         merchantId: merchant.id,
         ok: true,
@@ -165,15 +187,49 @@ async function triage(request: Request): Promise<unknown> {
         calls: outcome.calls,
       });
     } catch (error) {
-      results.push({
-        merchantId: merchant.id,
-        ok: false,
-        error: describeError(error),
-      });
+      results.push({ merchantId: merchant.id, ok: false, error: describeError(error) });
     }
   }
 
-  return { results, spentUsd };
+  return { results, spentUsd: spent() };
+}
+
+async function drafts(request: Request): Promise<unknown> {
+  const campaignId = request.campaignId ?? "eval";
+  const now = request.now === undefined ? undefined : new Date(request.now);
+  const { deps, spent, charge } = agentRun(request);
+
+  const results = [];
+
+  for (const merchant of request.merchants ?? []) {
+    // Deterministic identity. `runDraft` would otherwise stamp a UUID and the
+    // wall clock onto the draft, and re-recording the same merchant would
+    // produce a diff in which the only change is the id.
+    const draftDeps: DraftDeps = {
+      ...deps,
+      newId: () => `draft_${merchant.id}`,
+      now: () => new Date(request.now ?? "1970-01-01T00:00:00.000Z"),
+    };
+
+    try {
+      const outcome = await runDraft(enrich(merchant, now), campaignId, draftDeps);
+      charge(outcome.draft.usage.costUsd);
+      results.push({
+        merchantId: merchant.id,
+        ok: true,
+        draft: outcome.draft,
+        calls: outcome.calls,
+      });
+    } catch (error) {
+      // A draft whose evidence is not grounded throws here rather than
+      // becoming an object anyone can act on. That is a result worth
+      // reporting, not a crash: the recorded fixture still exists, and the
+      // rejection is exactly what the pipeline is supposed to do.
+      results.push({ merchantId: merchant.id, ok: false, error: describeError(error) });
+    }
+  }
+
+  return { results, spentUsd: spent() };
 }
 
 /** An error as data, keeping the typed `code` the domain errors carry. */
@@ -211,10 +267,13 @@ async function main(): Promise<void> {
     case "triage":
       process.stdout.write(JSON.stringify(await triage(request)));
       return;
+    case "drafts":
+      process.stdout.write(JSON.stringify(await drafts(request)));
+      return;
     default:
       throw new Error(
         `Unknown bridge command ${JSON.stringify(request.command)}. ` +
-          `Expected one of: meta, gates, triage.`,
+          `Expected one of: meta, gates, triage, drafts.`,
       );
   }
 }
